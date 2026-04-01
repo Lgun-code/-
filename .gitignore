@@ -1,0 +1,28 @@
+# === 编译输出文件 (绝对不能上传) ===
+*.o
+*.d
+*.crf
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+
+# === EIDE 插件产生的垃圾文件 ===
+build/
+Output Files/
+.eide/log/
+.eide/deps/
+
+# === Keil MDK-ARM 产生的垃圾文件 ===
+MDK-ARM/DebugConfig/
+MDK-ARM/Listings/
+MDK-ARM/Objects/
+MDK-ARM/RTE/
+*.uvoptx
+*.uvguix.*
+*.scvd
+*.bak
+
+# === VSCode 缓存 ===
+.vscode/

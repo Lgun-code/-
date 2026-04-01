@@ -1,0 +1,27 @@
+--cpu Cortex-M3
+"3-31_lidianchi\startup_stm32f103xb.o"
+"3-31_lidianchi\main.o"
+"3-31_lidianchi\gpio.o"
+"3-31_lidianchi\stm32f1xx_it.o"
+"3-31_lidianchi\stm32f1xx_hal_msp.o"
+"3-31_lidianchi\stm32f1xx_hal_gpio_ex.o"
+"3-31_lidianchi\stm32f1xx_hal.o"
+"3-31_lidianchi\stm32f1xx_hal_rcc.o"
+"3-31_lidianchi\stm32f1xx_hal_rcc_ex.o"
+"3-31_lidianchi\stm32f1xx_hal_gpio.o"
+"3-31_lidianchi\stm32f1xx_hal_dma.o"
+"3-31_lidianchi\stm32f1xx_hal_cortex.o"
+"3-31_lidianchi\stm32f1xx_hal_pwr.o"
+"3-31_lidianchi\stm32f1xx_hal_flash.o"
+"3-31_lidianchi\stm32f1xx_hal_flash_ex.o"
+"3-31_lidianchi\stm32f1xx_hal_exti.o"
+"3-31_lidianchi\system_stm32f1xx.o"
+"3-31_lidianchi\bsp_delay.o"
+"3-31_lidianchi\dht11.o"
+"3-31_lidianchi\ina226.o"
+"3-31_lidianchi\key.o"
+"3-31_lidianchi\oled.o"
+--library_type=microlib --strict --scatter "3-31_lidianchi\3-31_lidianchi.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "3-31_lidianchi.map" -o 3-31_lidianchi\3-31_lidianchi.axf
