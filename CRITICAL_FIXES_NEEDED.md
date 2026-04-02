@@ -1,0 +1,202 @@
+# 🚨 Critical Fixes Required
+
+## Priority 1: CRITICAL BUGS (Fix Immediately)
+
+### 1. DHT11 Temperature/Humidity Never Updates 🔴
+**File:** `Src/main.c:333`
+
+**Current Code (WRONG):**
+```c
+if ((pa1_level == 1U) && (DHT11_ReadData(&dht_temp, &dht_humi) == 1))
+{
+    temp = (float)dht_temp;
+    humi = (float)dht_humi;
+}
+```
+
+**Problem:** DHT11_ReadData returns:
+- 0 = Success
+- 1 = Sensor no response
+- 2 = Checksum error
+
+The condition checks for `== 1`, which means it only updates on FAILURE!
+
+**Fix:**
+```c
+if ((pa1_level == 1U) && (DHT11_ReadData(&dht_temp, &dht_humi) == 0))  // Check for 0 (success)
+{
+    temp = (float)dht_temp;
+    humi = (float)dht_humi;
+}
+```
+
+---
+
+### 2. UART Frame Detection Not Working 🔴
+**Files:** `Src/usart.c`, `Src/stm32f1xx_it.c`
+
+**Problem:**
+- IDLE interrupt is enabled (usart.c:153) but handler is not implemented
+- `g_usart2_rx.flag` is never set to 1
+- MQTT frame reception doesn't work properly
+- Cloud communication likely fails silently
+
+**Fix:** Add to `stm32f1xx_it.c`:
+```c
+void USART2_IRQHandler(void)
+{
+    // Check for IDLE line detection
+    if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE))
+    {
+        __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+        g_usart2_rx.flag = 1;  // Mark frame as complete
+    }
+
+    // Handle other UART interrupts
+    HAL_UART_IRQHandler(&huart2);
+}
+```
+
+Also add to usart.h:
+```c
+// Declare extern variables needed by interrupt handler
+extern UART_HandleTypeDef huart2;
+extern usart2_rx_t g_usart2_rx;
+```
+
+---
+
+## Priority 2: SECURITY ISSUE (Fix Before Production) 🟠
+
+### 3. Hardcoded Credentials in Source Code 🔴
+**File:** `code/cloud_service.h:17-27`
+
+**Problem:**
+```c
+#define WIFI_SSID       "abcd"
+#define WIFI_PASSWORD   "88888888"
+#define MQTT_BROKER_IP  "mqtts.heclouds.com"
+#define USERNAME        "zLsy5u45WJ"
+#define CLIENTID        "ddd"
+#define PASSWORD        "version=2018-10-31&res=products%2FzLsy5u45WJ%2Fdevices%2Fddd&et=1882951979&method=md5&sign=%2FKhP3TKhiejrEBtTVkxitw%3D%3D"
+```
+
+**Security Risk:**
+- WiFi password exposed in git repository
+- MQTT authentication tokens visible
+- Anyone with repo access can connect to your network and IoT platform
+
+**Fix:** Create `code/config_private.h` (add to .gitignore):
+```c
+#ifndef __CONFIG_PRIVATE_H
+#define __CONFIG_PRIVATE_H
+
+// WiFi Configuration
+#define WIFI_SSID       "your_wifi_ssid"
+#define WIFI_PASSWORD   "your_wifi_password"
+
+// MQTT Configuration
+#define MQTT_BROKER_IP  "mqtts.heclouds.com"
+#define MQTT_BROKER_PORT 1883
+#define USERNAME        "your_product_id"
+#define CLIENTID        "your_device_name"
+#define PASSWORD        "your_token_here"
+
+#define PUBTOPIC        "$sys/your_product_id/your_device_name/thing/property/post"
+#define SUBTOPIC        "$sys/your_product_id/your_device_name/thing/property/set"
+#define SUB_REPLY       "$sys/your_product_id/your_device_name/thing/property/set_reply"
+
+#endif
+```
+
+Then update `cloud_service.h` to include:
+```c
+#include "config_private.h"  // User credentials (not in git)
+```
+
+Add to `.gitignore`:
+```
+code/config_private.h
+```
+
+Create template file `code/config_private.h.template` for others to copy.
+
+---
+
+## Priority 3: CHARACTER ENCODING ISSUE 🟡
+
+### 4. Corrupted Chinese Comments Throughout Code
+**Files:** Multiple (.c, .h files)
+
+**Problem:**
+```c
+#include "stdio.h"  // 如果需要用 printf 打印调试，需要包含这个
+```
+Shows as: `// �����Ҫ�� printf ��ӡ���ڣ���Ҫ�������`
+
+**Fix:**
+1. Re-save all source files with UTF-8 encoding
+2. In your IDE/editor:
+   - Open each .c/.h file
+   - Change encoding to UTF-8 (without BOM)
+   - Save
+
+**Affected Files:**
+- Src/main.c
+- code/cloud_service.c
+- code/ina226.c
+- code/dht11.c
+- All other Chinese comments
+
+---
+
+## How to Verify Fixes
+
+### Test 1: DHT11 Reading
+```c
+// In main loop, add temporary debug:
+uint8_t result = DHT11_ReadData(&dht_temp, &dht_humi);
+printf("DHT11 result: %d, temp: %d, humi: %d\r\n", result, dht_temp, dht_humi);
+```
+Expected: result should be 0, and temp/humi should show real values
+
+### Test 2: UART Frame Detection
+```c
+// In main loop after cloud operations:
+if (g_usart2_rx.flag == 1) {
+    printf("UART2 frame received, length: %d\r\n", g_usart2_rx.len);
+}
+```
+Expected: Should see message when ESP8266 sends data
+
+### Test 3: OLED Display
+- Temperature and humidity should update (not stuck at 0.0 or old value)
+- Should change when you heat/cool the DHT11 sensor
+
+---
+
+## Estimated Fix Time
+
+| Issue | Time | Difficulty |
+|-------|------|------------|
+| DHT11 bug | 2 min | Easy |
+| UART IDLE handler | 10 min | Medium |
+| Move credentials | 15 min | Easy |
+| Fix encoding | 20 min | Easy |
+| **Total** | **~50 min** | |
+
+---
+
+## Next Steps After Fixes
+
+1. Test all fixes on hardware
+2. Verify cloud connectivity works
+3. Check temperature/humidity updates correctly
+4. Verify alarm system triggers at correct voltage
+5. Test button controls (threshold adjustment)
+6. Monitor for 24+ hours for stability
+
+---
+
+**Generated by Code Review on:** April 2, 2026
+**See full review in:** CODE_REVIEW.md
