@@ -12,13 +12,25 @@ extern float power_mw;
 
 
 /* 内部变量 */
-bool baojing = true;
+bool baojing = false;
 bool fire = true;
 bool wring = true;
 
 static uint8_t NET_Step = 0;  
 uint8_t NET_State = 0;  
 static uint32_t last_upload_tick = 0; // 上传时间戳
+static uint8_t g_baojing_force_upload_cnt = 0;
+
+void Cloud_SetBaojing(bool state)
+{
+    if (baojing != state)
+    {
+        baojing = state;
+        /* 状态变化后连续触发几次即时上报，提高云端接收成功率 */
+        g_baojing_force_upload_cnt = 3;
+        last_upload_tick = 0;
+    }
+}
 
 /* ================= 辅助函数 ================= */
 
@@ -33,6 +45,7 @@ void Cloud_ResetLink(void)
     NET_Step = 0;
     NET_State = 0;
     last_upload_tick = 0;
+    g_baojing_force_upload_cnt = 0;
     g_usart2_rx.len = 0;
     g_usart2_rx.flag = 0;
     memset(g_usart2_rx.buf, 0, USART2_RX_BUF_SIZE);
@@ -206,9 +219,21 @@ void Cloud_IoT_Loop(void)
 /* ================= 业务逻辑：数据上传 ================= */
 void Cloud_Upload_Handler(void)
 {
+    uint8_t do_upload = 0;
+
     if (NET_State != 2) return;
 
     if (HAL_GetTick() - last_upload_tick >= UPLOAD_INTERVAL)
+    {
+        do_upload = 1;
+    }
+
+    if (g_baojing_force_upload_cnt > 0)
+    {
+        do_upload = 1;
+    }
+
+    if (do_upload)
     {
         last_upload_tick = HAL_GetTick();
 
@@ -225,7 +250,7 @@ void Cloud_Upload_Handler(void)
 
         json_add_float(buff, sizeof(buff), "I", current_ma);
         json_add_float(buff, sizeof(buff), "V", bus_voltage);
-        // json_add_bool(buff, sizeof(buff), "baojing", baojing ? "true" : "false");
+        json_add_bool(buff, sizeof(buff), "baojing", baojing ? "true" : "false");
 		// 		json_add_bool(buff, sizeof(buff), "fire", fire ? "true" : "false");
 		// 		json_add_bool(buff, sizeof(buff), "wring", wring ? "true" : "false");
         json_end(buff);
@@ -233,7 +258,12 @@ void Cloud_Upload_Handler(void)
         MQTT_PUBLISH_LEVEL0(0, PUBTOPIC, (unsigned char*)buff, strlen(buff));
         
         Cloud_SendBytes(mqtt.buff, mqtt.length);
-        
+
+        if (g_baojing_force_upload_cnt > 0)
+        {
+            g_baojing_force_upload_cnt--;
+        }
+
         // printf("Data Uploaded: %s\r\n", buff);
     }
 }

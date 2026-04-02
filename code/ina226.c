@@ -272,10 +272,31 @@ float INA226_Get_BusVoltage(void)
 float INA226_Get_Current(void)
 {
     int16_t raw_current = 0;
+    int16_t raw_shunt = 0;
+    float shunt_mv = 0.0f;
     
     // 强制转换为带符号的 int16_t 
     // INA226 内部使用补码表示负数，转化为 int16_t 会自动映射出正确负值
     raw_current = (int16_t)INA226_ReadReg(REG_CURRENT);
+
+    /* 某些情况下校准寄存器会失效，先尝试重写校准并重读 */
+    if (raw_current == 0)
+    {
+        raw_shunt = (int16_t)INA226_ReadReg(REG_SHUNT_V);
+        if (raw_shunt != 0)
+        {
+            INA226_WriteReg(REG_CALIBRATION, INA226_CAL_VALUE);
+            raw_current = (int16_t)INA226_ReadReg(REG_CURRENT);
+
+            /* 若电流寄存器仍为0，则用分流电压按欧姆定律兜底换算 */
+            if (raw_current == 0)
+            {
+                /* Shunt Voltage LSB = 2.5uV = 0.0025mV */
+                shunt_mv = (float)raw_shunt * 0.0025f;
+                return (shunt_mv / INA226_R_SHUNT) * 1000.0f;
+            }
+        }
+    }
     
     // 原始数据乘以 LSB 即为真实毫安值
     return (float)raw_current * INA226_CURRENT_LSB;

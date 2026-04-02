@@ -36,6 +36,7 @@ void Cloud_Handle_Message(void);
 void Cloud_Upload_Handler(void);
 void Cloud_SendBytes(uint8_t *data, uint16_t len);
 void Cloud_ResetLink(void);
+void Cloud_SetBaojing(bool state);
 #ifdef __cplusplus
 }
 #endif
